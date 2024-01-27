@@ -28,7 +28,7 @@ void __sanitizer_cov_trace_pc(void)
     void* pc = __builtin_return_address(0);
 
     char pcDescr[1024];
-    __sanitizer_symbolize_pc(pc, "%s\t%l", pcDescr, sizeof(pcDescr));
+    __sanitizer_symbolize_pc(pc, "%p\t%s\t%l", pcDescr, sizeof(pcDescr));
     printf("cov: %s\n", pcDescr);
 
     printf("Hash: %d\n", hash_string(pcDescr));

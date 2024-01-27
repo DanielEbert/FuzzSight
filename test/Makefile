@@ -1,5 +1,5 @@
-CXX=g++-8
-CXXFLAGS=-g -fsanitize-coverage=trace-pc -fsanitize=address,undefined
+CXX=g++-9
+CXXFLAGS=-g -fsanitize-coverage=trace-pc -fsanitize=address,undefined -no-pie
 
 all: main
 
