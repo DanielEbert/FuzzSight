@@ -3,9 +3,8 @@ import './App.css';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IoMdArrowDropright } from "react-icons/io";
 import { IoMdArrowDropdown } from "react-icons/io";
-import { AiOutlineLoading } from "react-icons/ai";
 import TreeView from "react-accessible-treeview";
-import cx from "classnames";
+import { Highlight, themes } from "prism-react-renderer"
 
 // TODO: select root folder via other explorer selection
 const initialData = [
@@ -26,7 +25,7 @@ const initialData = [
   }
 ];
 
-function MultiSelectCheckboxAsync() {
+function MultiSelectCheckboxAsync({ setSelectedFile }) {
   const loadedAlertElement = useRef(null);
   const [data, setData] = useState(initialData);
   const [nodesAlreadyLoaded, setNodesAlreadyLoaded] = useState([]);
@@ -117,8 +116,14 @@ function MultiSelectCheckboxAsync() {
                     {isExpanded ? <IoMdArrowDropdown /> : <IoMdArrowDropright />}
                   </div>
                 }
-                <div className='whitespace-nowrap select-none' onClick={(e) => {
+                <div className='whitespace-nowrap select-none w-full' onClick={(e) => {
                   console.log('clicked' + element.fullpath)
+                  if (element.isBranch) {
+                    return;
+                  }
+
+                  setSelectedFile(element.fullpath);
+
                   e.stopPropagation();
                 }}>{element.name}</div>
               </div>
@@ -130,7 +135,7 @@ function MultiSelectCheckboxAsync() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ setSelectedFile }) {
   const [width, setWidth] = useState(280);
   const isResized = useRef(false);
 
@@ -147,17 +152,62 @@ function Sidebar() {
   return (
     <div className='flex min-h-screen'>
       <div style={{ width: `${width / 16}rem` }} className='overflow-hidden'>
-        <MultiSelectCheckboxAsync />
+        <MultiSelectCheckboxAsync setSelectedFile={setSelectedFile} />
       </div>
       <div className='w-2 cursor-col-resize bg-gray-300' onMouseDown={() => isResized.current = true} />
     </div>
   )
 }
 
+function CodePanel({ selectedFile }) {
+  const [code, setCode] = useState('');
+
+  useEffect(() => {
+    if (!selectedFile) return;
+
+    window.electronAPI.readFileSync(selectedFile).then(content => {
+      console.log(content)
+      // todo split by line?
+      setCode(content)
+    });
+
+  }, [selectedFile])
+
+  return <div className='pl-1'>
+    <div className='text-xl tracking-tight text-gray-900 border-b mb-3 pl-1'>{selectedFile ? selectedFile : ''}</div>
+    <Highlight theme={themes.oneDark} language='cpp' code={code}>
+      {({ className, style, tokens, getLineProps, getTokenProps }) => (
+        <pre style={style} className='flex'>
+          <div>
+            {tokens.map((line, i) => (
+              <div key={i} {...getLineProps({ line })} className='bg-white text-right'>
+                <div className='pr-2'>{i + 1}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            {tokens.map((line, i) => (
+              <div key={i} {...getLineProps({ line })} className='flex bg-white'>
+                {line.map((token, key) => (
+                  <span key={key} {...getTokenProps({ token })} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </pre>
+      )}
+    </Highlight>
+  </div>
+}
+
 function Main() {
+  // TODO: change def sel file to null
+  const [selectedFile, setSelectedFile] = useState('/tmp/a.cpp')
+
   return (
-    <div className="min-h-screen w-full prose">
-      <Sidebar />
+    <div className="min-h-screen w-full min-w-full prose flex">
+      <Sidebar setSelectedFile={setSelectedFile} />
+      <CodePanel selectedFile={selectedFile} />
     </div>
   );
 }

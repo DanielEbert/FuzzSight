@@ -9,3 +9,6 @@
 - maybe use __sanitizer_symbolize_pc for fast PC -> src code lookup? if its fast
 
 
+### frontend
+
+- can use file api to get src code files. can use rest api toget covered lines

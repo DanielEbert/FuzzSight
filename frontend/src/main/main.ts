@@ -37,7 +37,17 @@ ipcMain.handle('readdir', async (event, path, config) => {
       isFolder: false
     }];
   }
-})
+});
+
+ipcMain.handle('readFileSync', async (event, path) => {
+  try {
+    const fileContent = await fs.promises.readFile(path, { encoding: 'utf-8' });
+    return fileContent;
+  } catch (error: any) {
+    console.error(error)
+    return error.message;
+  }
+});
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
