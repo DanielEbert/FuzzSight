@@ -11,6 +11,8 @@ from flask_cors import CORS
 import threading
 from typing import NoReturn
 import json
+import subprocess
+import sys
 
 
 BUFFER_SIZE = 1024
@@ -33,10 +35,34 @@ class File:
         self.lines[covered_line] = True
 
 class Program:
-    def __init__(self) -> None:
+    def __init__(self, prog_path: str) -> None:
+        self.prog_path = prog_path
         self.files: dict[str, File] = defaultdict(File)
+        self.cov_trace_pc_return_addresses = self.get_cov_trace_pc_return_addresses()
+        # TODO: convert addr to line using addr2line subproc
 
-prog = Program()
+    def get_cov_trace_pc_return_addresses(self) -> list[int]:
+        cov_trace_pc_return_addresses: list[int] = []
+        objdump_output = subprocess.check_output(['objdump', '-d', self.prog_path], encoding='utf-8')
+        assembly_lines = objdump_output.split('\n')
+
+        for i, line in enumerate(assembly_lines):
+            if not line.endswith('<__sanitizer_cov_trace_pc>'):
+                continue
+            ret_line = assembly_lines[i+1]
+            return_address = int(ret_line.strip().split('\t')[0][:-1], 16)
+            cov_trace_pc_return_addresses.append(return_address)
+    
+        return cov_trace_pc_return_addresses
+
+
+
+# TODO: use argparse later
+if len(sys.argv) < 2:
+    raise Exception('Missing argument to target executable. ./main.py path/to/target')
+
+prog = Program(sys.argv[1])
+print(prog.cov_trace_pc_return_addresses)
 
 
 def main() -> NoReturn:
@@ -73,6 +99,8 @@ def new_cov_receiver(new_cov_queue: mp.Queue[tuple[int, str, int]]) -> None:
         message, _ = sock.recvfrom(BUFFER_SIZE)
 
         pc, file, line = message.decode().split('\t')
+        # ASAN decrements 1 from pc
+        pc += 1
         print('Received', pc, file, line)
 
         try:

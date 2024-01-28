@@ -200,11 +200,11 @@ function CodePanel({ selectedFile }) {
 
   }, [selectedFile])
 
-  return <div className='pl-1'>
+  return <div className='pl-1 w-full'>
     <div className='text-xl tracking-tight text-gray-900 border-b mb-3 pl-1'>{selectedFile ? selectedFile : ''}</div>
     <Highlight theme={themes.oneDark} language='cpp' code={code}>
       {({ className, style, tokens, getLineProps, getTokenProps }) => (
-        <pre style={style} className='flex'>
+        <pre style={style} className='flex w-full'>
           <div>
             {tokens.map((line, i) => (
               <div key={i} {...getLineProps({ line })} className='bg-white text-right'>
@@ -212,11 +212,11 @@ function CodePanel({ selectedFile }) {
               </div>
             ))}
           </div>
-          <div>
+          <div className='w-full'>
             {tokens.map((line, i) => (
               <div key={i} {...getLineProps({ line })} className={`flex ${lineIsCovered(i + 1) ? 'bg-green-100' : 'bg-white'}`}>
                 {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token })} />
+                  <div key={key} {...getTokenProps({ token })} />
                 ))}
               </div>
             ))}
