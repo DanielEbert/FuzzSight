@@ -5,6 +5,7 @@ import { IoMdArrowDropright } from "react-icons/io";
 import { IoMdArrowDropdown } from "react-icons/io";
 import TreeView from "react-accessible-treeview";
 import { Highlight, themes } from "prism-react-renderer"
+import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // TODO: select root folder via other explorer selection
 const initialData = [
@@ -24,6 +25,8 @@ const initialData = [
     fullpath: "/tmp"
   }
 ];
+
+const queryClient = new QueryClient();
 
 function MultiSelectCheckboxAsync({ setSelectedFile }) {
   const loadedAlertElement = useRef(null);
@@ -161,6 +164,30 @@ function Sidebar({ setSelectedFile }) {
 
 function CodePanel({ selectedFile }) {
   const [code, setCode] = useState('');
+  // TODO: later check if out of range
+  const [coveredLines, setCoveredLines] = useState([]);
+
+  useQuery({
+    queryKey: ['coveredLines'],
+    queryFn: async () => {
+      const response = await fetch('http://localhost:7156/coveredLines');
+      if (!response.ok) {
+        throw new Error('Failed to fetch /coveredLines')
+      }
+      const receivedCoveredLines = await response.json();
+      setCoveredLines(receivedCoveredLines);
+      return receivedCoveredLines;
+    },
+    refetchInterval: 2000
+  })
+
+  const lineIsCovered = (lineNumber) => {
+    if (lineNumber > coveredLines.length) {
+      console.warn('lineIsCovered lineNumber out of range ' + lineNumber);
+      return false;
+    }
+    return coveredLines[lineNumber];
+  };
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -187,7 +214,7 @@ function CodePanel({ selectedFile }) {
           </div>
           <div>
             {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })} className='flex bg-white'>
+              <div key={i} {...getLineProps({ line })} className={`flex ${lineIsCovered(i) ? 'bg-green-100' : 'bg-white'}`}>
                 {line.map((token, key) => (
                   <span key={key} {...getTokenProps({ token })} />
                 ))}
@@ -214,10 +241,12 @@ function Main() {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Main />} />
-      </Routes>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Main />} />
+        </Routes>
+      </Router>
+    </QueryClientProvider>
   );
 }

@@ -11,4 +11,4 @@
 
 ### frontend
 
-- can use file api to get src code files. can use rest api toget covered lines
+- page with overview and % cov lines of all files, like lcov
