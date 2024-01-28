@@ -11,7 +11,6 @@ from flask_cors import CORS
 import threading
 from typing import NoReturn
 import json
-import random
 
 
 BUFFER_SIZE = 1024
@@ -27,20 +26,18 @@ class File:
         # Line index [0] does not exist and is thus never covered.
         self.lines: list[bool] = [False]
     
-    def set_covered_lines(self, covered_lines: list[int]):
-        maxIndex = max(covered_lines)
-        if maxIndex >= len(self.lines):
-            self.lines.extend([False] * (maxIndex + 1 - len(self.lines)))
+    def set_covered_line(self, covered_line: int):
+        if covered_line >= len(self.lines):
+            self.lines.extend([False] * (covered_line + 1 - len(self.lines)))
 
-        for i in covered_lines:
-            self.lines[i] = True
+        self.lines[covered_line] = True
 
 class Program:
     def __init__(self) -> None:
         self.files: dict[str, File] = defaultdict(File)
 
 prog = Program()
-prog.files['a.cpp'].set_covered_lines([3,6,7,8])
+
 
 def main() -> NoReturn:
 
@@ -55,15 +52,15 @@ def main() -> NoReturn:
 
     while True:
         try:
-            pc, file, line = new_cov_queue.get(block=False)
-            prog.files[file].lines[line].append(pc)
+            _, file, line = new_cov_queue.get(block=False)
+            prog.files[file].set_covered_line(line)
         except queue.Empty:
             pass
 
         if last_cov_receive_time + 0.3 < time.time():
             time.sleep(0.1)
 
-            prog.files['a.cpp'].set_covered_lines([random.randrange(200)])
+            # prog.files['a.cpp'].set_covered_lines([random.randrange(200)])
 
 
 def new_cov_receiver(new_cov_queue: mp.Queue[tuple[int, str, int]]) -> None:
@@ -101,7 +98,8 @@ CORS(app)
 @app.route('/coveredLines')
 def getCoveredLines():
     # TODO: file based on param
-    ret = json.dumps(prog.files['a.cpp'].lines)
+    ret = json.dumps(prog.files['/home/user/P/FuzzSight/test/main.cpp'].lines)
+    print(ret)
     return ret
 
 

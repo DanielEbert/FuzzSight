@@ -17,12 +17,12 @@ const initialData = [
     fullpath: ""
   },
   {
-    name: "tmp",
+    name: "FuzzSight",
     children: [],
     id: 1,
     parent: 0,
     isBranch: true,
-    fullpath: "/tmp"
+    fullpath: "/home/user/P/FuzzSight"
   }
 ];
 
@@ -214,7 +214,7 @@ function CodePanel({ selectedFile }) {
           </div>
           <div>
             {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })} className={`flex ${lineIsCovered(i) ? 'bg-green-100' : 'bg-white'}`}>
+              <div key={i} {...getLineProps({ line })} className={`flex ${lineIsCovered(i + 1) ? 'bg-green-100' : 'bg-white'}`}>
                 {line.map((token, key) => (
                   <span key={key} {...getTokenProps({ token })} />
                 ))}
@@ -229,7 +229,7 @@ function CodePanel({ selectedFile }) {
 
 function Main() {
   // TODO: change def sel file to null
-  const [selectedFile, setSelectedFile] = useState('/tmp/a.cpp')
+  const [selectedFile, setSelectedFile] = useState('/home/user/P/FuzzSight/test/main.cpp')
 
   return (
     <div className="min-h-screen w-full min-w-full prose flex">
