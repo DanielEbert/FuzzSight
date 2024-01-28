@@ -1,7 +1,8 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IoMdArrowDropright } from "react-icons/io";
+import { IoMdArrowDropdown } from "react-icons/io";
 import { AiOutlineLoading } from "react-icons/ai";
 import TreeView from "react-accessible-treeview";
 import cx from "classnames";
@@ -47,14 +48,15 @@ function MultiSelectCheckboxAsync() {
       return Promise.resolve();
     }
 
-    return window.electronAPI.readdir(element.fullpath, { fullpath: true }).then(files => {
+    return window.electronAPI.readdir(element.fullpath, { fullpath: true, withFileTypes: true }).then(files => {
+      console.log(files)
       const newChildren = files.map((file, i) => ({
-        name: file,
+        name: file.name,
         children: [],
         id: element.id + '-' + i,
         parent: element.id,
-        isBranch: false,
-        fullpath: element.fullpath + '/' + file
+        isBranch: file.isFolder,
+        fullpath: element.fullpath + '/' + file.name
       }));
 
       setData(value => updateTreeData(value, element.id, newChildren));
@@ -103,35 +105,22 @@ function MultiSelectCheckboxAsync() {
             handleSelect,
             handleExpand,
           }) => {
-            const branchNode = (isExpanded, element) => {
-              return isExpanded && element.children.length === 0 ? (
-                <>
-                  <span
-                    role="alert"
-                    aria-live="assertive"
-                    className="visually-hidden"
-                  >
-                    loading {element.name}
-                  </span>
-                  <AiOutlineLoading
-                    aria-hidden={true}
-                    className="loading-icon"
-                  />
-                </>
-              ) : (
-                <ArrowIcon isOpen={isExpanded} />
-              );
-            };
             return (
               <div
                 {...getNodeProps({ onClick: handleExpand })}
                 style={{ marginLeft: 40 * (level - 1) }}
+                className='flex hover:bg-gray-300'
               >
-                {isBranch && branchNode(isExpanded, element)}
-                <span className="name" onClick={(e) => {
+                {
+                  element.isBranch &&
+                  <div className='flex-none flex items-center justify-center'>
+                    {isExpanded ? <IoMdArrowDropdown /> : <IoMdArrowDropright />}
+                  </div>
+                }
+                <div className='whitespace-nowrap select-none' onClick={(e) => {
                   console.log('clicked' + element.fullpath)
                   e.stopPropagation();
-              }}>{element.name}</span>
+                }}>{element.name}</div>
               </div>
             );
           }}
@@ -141,23 +130,34 @@ function MultiSelectCheckboxAsync() {
   );
 }
 
-const ArrowIcon = ({ isOpen, className }) => {
-  const baseClass = "arrow";
-  const classes = cx(
-    baseClass,
-    { [`${baseClass}--closed`]: !isOpen },
-    { [`${baseClass}--open`]: isOpen },
-    className
-  );
-  return <IoMdArrowDropright className={classes} />;
-};
+function Sidebar() {
+  const [width, setWidth] = useState(280);
+  const isResized = useRef(false);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', (e) => {
+      if (!isResized.current) { return; }
+      setWidth((prevWidth) => prevWidth + e.movementX);
+    });
+    window.addEventListener('mouseup', () => {
+      isResized.current = false;
+    })
+  }, [])
+
+  return (
+    <div className='flex min-h-screen'>
+      <div style={{ width: `${width / 16}rem` }} className='overflow-hidden'>
+        <MultiSelectCheckboxAsync />
+      </div>
+      <div className='w-2 cursor-col-resize bg-gray-300' onMouseDown={() => isResized.current = true} />
+    </div>
+  )
+}
 
 function Main() {
   return (
-    <div className="min-h-screen prose">
-      <div>
-        <MultiSelectCheckboxAsync />
-      </div>
+    <div className="min-h-screen w-full prose">
+      <Sidebar />
     </div>
   );
 }

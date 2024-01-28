@@ -23,8 +23,20 @@ ipcMain.on('ipc-example', async (event, arg) => {
 });
 
 ipcMain.handle('readdir', async (event, path, config) => {
-  const result = await fs.promises.readdir(path, config);
-  return result;
+  try {
+    const result = await fs.promises.readdir(path, config);
+    const files = result.map(((file: any) => ({
+      name: file.name,
+      isFolder: file.isDirectory()
+    })));
+    return files;
+  } catch (error: any) {
+    console.error(error);
+    return [{
+      name: error.message,
+      isFolder: false
+    }];
+  }
 })
 
 if (process.env.NODE_ENV === 'production') {
