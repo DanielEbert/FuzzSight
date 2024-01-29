@@ -116,7 +116,7 @@ function MultiSelectCheckboxAsync({ setSelectedFile }) {
             return (
               <div
                 {...getNodeProps({ onClick: handleExpand })}
-                style={{ marginLeft: 40 * (level - 1) }}
+                style={{ marginLeft: 20 * (level - 1) }}
                 className="flex hover:bg-gray-300"
               >
                 {element.isBranch && (
@@ -185,7 +185,7 @@ function Sidebar({ setSelectedFile }) {
   );
 }
 
-function CoverageTable({ fileData }) {
+function CoverageTable({ fileData, setSelectedFile }) {
   return (
     <table className="w-full text-left text-gray-500 table-fixed">
       <tr>
@@ -208,7 +208,12 @@ function CoverageTable({ fileData }) {
                 scope="row"
                 className="px-4 py-2 relative font-medium text-gray-900 whitespace-nowrap"
               >
-                <div class="group relative">
+                <div
+                  class="group relative"
+                  onClick={() => {
+                    setSelectedFile({ path: filename, isFolder: false });
+                  }}
+                >
                   <div className="overflow-x-hidden">{filename}</div>
                   <div class="absolute inset-0 flex opacity-0 group-hover:opacity-100 bg-gray-50 bg-opacity-100 w-screen">
                     {filename}
@@ -235,7 +240,7 @@ function CoverageTable({ fileData }) {
   );
 }
 
-function CoverageOverview({ selectedFolder }) {
+function CoverageOverview({ selectedFolder, setSelectedFile }) {
   // fileCoverage[0] are selected files, [1] are unselected
   const [fileCoverage, setFileCoverage] = useState({
     selected: [],
@@ -268,13 +273,19 @@ function CoverageOverview({ selectedFolder }) {
         <div className="text-xl font-bold whitespace-nowrap text-gray-900 px-3 py-1">
           Files in {selectedFolder}
         </div>
-        <CoverageTable fileData={fileCoverage.selected} />
+        <CoverageTable
+          fileData={fileCoverage.selected}
+          setSelectedFile={setSelectedFile}
+        />
       </div>
       <div>
         <div className="text-xl font-bold whitespace-nowrap text-gray-900 px-3 py-1">
           Other Files
         </div>
-        <CoverageTable fileData={fileCoverage.unselected} />
+        <CoverageTable
+          fileData={fileCoverage.unselected}
+          setSelectedFile={setSelectedFile}
+        />
       </div>
     </div>
   );
@@ -394,7 +405,10 @@ function Main() {
     <div className="min-h-screen w-full min-w-full prose flex">
       <Sidebar setSelectedFile={setSelectedFile} />
       {selectedFile.isFolder ? (
-        <CoverageOverview selectedFolder={selectedFile.path} />
+        <CoverageOverview
+          selectedFolder={selectedFile.path}
+          setSelectedFile={setSelectedFile}
+        />
       ) : (
         <CodePanel selectedFile={selectedFile.path} />
       )}
