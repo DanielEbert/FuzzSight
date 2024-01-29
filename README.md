@@ -11,12 +11,9 @@
 - page with overview and % cov lines of all files, like lcov
 - for 'cov in all files', check all files linked in elf and display these - use GDB for fast lookup
   - percentage will be difficult, since we don't know how many lines are actually covered and executable
+    -> might not be needed anymore, since we include them with objdump - not all, but the ones we care about
 
-### find uncovered
+### mid
 
-- check objdump where we have calls to \_\_sanitizer_cov_trace_pc
-- remember return addr is 1 after call to cov_trace_pc
-
-  - when parsing objdump output, remember the instr after call to cov_trace_pc
-
-- instead of sending true false to ui, send color code: 0 white - 1 green - 2 red
+- split in different files
+- argparse

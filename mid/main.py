@@ -3,7 +3,6 @@ from __future__ import annotations
 import socket
 import multiprocessing as mp
 import queue
-from dataclasses import dataclass
 from collections import defaultdict
 import time
 from flask import Flask
@@ -19,29 +18,34 @@ import struct
 BUFFER_SIZE = 1024
 SERVER_PORT = 7155
 
-@dataclass
-class SrcLine:
-    addr: int
-    line: int
+LINE_COVERAGE_UNKNOWN = 0
+LINE_COVERED = 1
+LINE_NOT_COVERED = 2
 
 class File:
     def __init__(self) -> None:
         # 0: unknown
         # 1: covered
         # 2: not covered
-        self.lines: list[int] = [0]
-    
+        self.lines: list[int] = [LINE_COVERAGE_UNKNOWN]
+
     def set_covered_line(self, covered_line: int) -> None:
         if covered_line >= len(self.lines):
-            self.lines.extend([0] * (covered_line + 1 - len(self.lines)))
+            self.lines.extend([LINE_COVERAGE_UNKNOWN] * (covered_line + 1 - len(self.lines)))
 
-        self.lines[covered_line] = 1
+        self.lines[covered_line] = LINE_COVERED
     
     def set_uncovered_line(self, uncovered_line: int) -> None:
         if uncovered_line >= len(self.lines):
-            self.lines.extend([0] * (uncovered_line + 1 - len(self.lines)))
+            self.lines.extend([LINE_COVERAGE_UNKNOWN] * (uncovered_line + 1 - len(self.lines)))
 
-        self.lines[uncovered_line] = 2
+        self.lines[uncovered_line] = LINE_NOT_COVERED
+    
+    def get_covered_lines_count(self) -> int:
+        self.lines.count(LINE_COVERED)
+
+    def get_uncovered_lines_count(self) -> int:
+        self.lines.count(LINE_NOT_COVERED)
 
 
 class Addr2Line:
@@ -103,7 +107,12 @@ class Program:
             return
 
         self.files[file].set_covered_line(line)
-
+    
+    def get_coverage_overview(self) -> tuple[str, int, int]:
+        # Returns tuple of [filename, covered_lines, uncovered_lines]
+        ret = []
+        for filename, file in self.files.items():
+            ret.append((filename, file.get_covered_lines_count(), file.get_uncovered_lines_count()))
 
 
 # TODO: use argparse later
@@ -127,15 +136,11 @@ def main() -> NoReturn:
         try:
             pc = new_cov_queue.get(block=False)
             prog.on_new_addr_covered(pc)
-            # TODO prog.files[file].set_covered_line(line)
         except queue.Empty:
             pass
 
         if last_cov_receive_time + 0.3 < time.time():
             time.sleep(0.1)
-
-            # prog.files['a.cpp'].set_covered_lines([random.randrange(200)])
-
 
 def new_cov_receiver(new_cov_queue: mp.Queue[tuple[int, str, int]]) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -146,9 +151,8 @@ def new_cov_receiver(new_cov_queue: mp.Queue[tuple[int, str, int]]) -> None:
     while True:
         message, _ = sock.recvfrom(BUFFER_SIZE)
 
-        print(message)
         pc = struct.unpack('Q', message)[0]
-        print('Received', pc)
+        print('Covered', pc)
 
         new_cov_queue.put(pc)
 
@@ -163,9 +167,14 @@ CORS(app)
 def getCoveredLines():
     # TODO: file based on param
     ret = json.dumps(prog.files['/home/user/P/FuzzSight/test/main.cpp'].lines)
-    print(ret)
     return ret
 
+
+@app.route('/coverageOverview')
+def getCoverageOverview():
+    ret = json.dumps(prog.get_coverage_overview())
+    print(ret)
+    return ret
 
 if __name__ == '__main__':
     raise SystemExit(main())
