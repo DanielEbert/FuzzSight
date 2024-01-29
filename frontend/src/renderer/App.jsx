@@ -1,29 +1,33 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IoMdArrowDropright } from "react-icons/io";
-import { IoMdArrowDropdown } from "react-icons/io";
-import TreeView from "react-accessible-treeview";
-import { Highlight, themes } from "prism-react-renderer"
-import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { IoMdArrowDropright } from 'react-icons/io';
+import { IoMdArrowDropdown } from 'react-icons/io';
+import TreeView from 'react-accessible-treeview';
+import { Highlight, themes } from 'prism-react-renderer';
+import {
+  useQuery,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 
 // TODO: select root folder via other explorer selection
 const initialData = [
   {
-    name: "",
+    name: '',
     id: 0,
     children: [1],
     parent: null,
-    fullpath: ""
+    fullpath: '',
   },
   {
-    name: "FuzzSight",
+    name: 'FuzzSight',
     children: [],
     id: 1,
     parent: 0,
     isBranch: true,
-    fullpath: "/home/user/P/FuzzSight"
-  }
+    fullpath: '/home/user/P/FuzzSight',
+  },
 ];
 
 const queryClient = new QueryClient();
@@ -50,19 +54,21 @@ function MultiSelectCheckboxAsync({ setSelectedFile }) {
       return Promise.resolve();
     }
 
-    return window.electronAPI.readdir(element.fullpath, { fullpath: true, withFileTypes: true }).then(files => {
-      console.log(files)
-      const newChildren = files.map((file, i) => ({
-        name: file.name,
-        children: [],
-        id: element.id + '-' + i,
-        parent: element.id,
-        isBranch: file.isFolder,
-        fullpath: element.fullpath + '/' + file.name
-      }));
+    return window.electronAPI
+      .readdir(element.fullpath, { fullpath: true, withFileTypes: true })
+      .then((files) => {
+        console.log(files);
+        const newChildren = files.map((file, i) => ({
+          name: file.name,
+          children: [],
+          id: element.id + '-' + i,
+          parent: element.id,
+          isBranch: file.isFolder,
+          fullpath: element.fullpath + '/' + file.name,
+        }));
 
-      setData(value => updateTreeData(value, element.id, newChildren));
-    });
+        setData((value) => updateTreeData(value, element.id, newChildren));
+      });
   };
 
   const wrappedOnLoadData = async (props) => {
@@ -80,7 +86,7 @@ function MultiSelectCheckboxAsync({ setSelectedFile }) {
 
       // Clearing aria-live region so loaded node alerts no longer appear in DOM
       setTimeout(() => {
-        el && (el.innerHTML = "");
+        el && (el.innerHTML = '');
       }, 5000);
     }
   };
@@ -111,24 +117,32 @@ function MultiSelectCheckboxAsync({ setSelectedFile }) {
               <div
                 {...getNodeProps({ onClick: handleExpand })}
                 style={{ marginLeft: 40 * (level - 1) }}
-                className='flex hover:bg-gray-300'
+                className="flex hover:bg-gray-300"
               >
-                {
-                  element.isBranch &&
-                  <div className='flex-none flex items-center justify-center'>
-                    {isExpanded ? <IoMdArrowDropdown /> : <IoMdArrowDropright />}
+                {element.isBranch && (
+                  <div className="flex-none flex items-center justify-center">
+                    {isExpanded ? (
+                      <IoMdArrowDropdown />
+                    ) : (
+                      <IoMdArrowDropright />
+                    )}
                   </div>
-                }
-                <div className='whitespace-nowrap select-none w-full' onClick={(e) => {
-                  console.log('clicked' + element.fullpath)
-                  if (element.isBranch) {
-                    return;
-                  }
+                )}
+                <div
+                  className="whitespace-nowrap select-none w-full"
+                  onClick={(e) => {
+                    console.log('clicked' + element.fullpath);
+                    if (element.isBranch) {
+                      return;
+                    }
 
-                  setSelectedFile(element.fullpath);
+                    setSelectedFile(element.fullpath);
 
-                  e.stopPropagation();
-                }}>{element.name}</div>
+                    e.stopPropagation();
+                  }}
+                >
+                  {element.name}
+                </div>
               </div>
             );
           }}
@@ -144,92 +158,130 @@ function Sidebar({ setSelectedFile }) {
 
   useEffect(() => {
     window.addEventListener('mousemove', (e) => {
-      if (!isResized.current) { return; }
+      if (!isResized.current) {
+        return;
+      }
       setWidth((prevWidth) => prevWidth + e.movementX);
     });
     window.addEventListener('mouseup', () => {
       isResized.current = false;
-    })
-  }, [])
+    });
+  }, []);
 
   return (
-    <div className='flex min-h-screen'>
-      <div style={{ width: `${width / 16}rem` }} className='overflow-hidden'>
+    <div className="flex min-h-screen">
+      <div style={{ width: `${width / 16}rem` }} className="overflow-hidden">
         <MultiSelectCheckboxAsync setSelectedFile={setSelectedFile} />
       </div>
-      <div className='w-2 cursor-col-resize bg-gray-300' onMouseDown={() => isResized.current = true} />
+      <div
+        className="w-2 cursor-col-resize bg-gray-300"
+        onMouseDown={() => (isResized.current = true)}
+      />
     </div>
-  )
+  );
 }
 
 function CodePanel({ selectedFile }) {
   const [code, setCode] = useState('');
   // TODO: later check if out of range
-  const [coveredLines, setCoveredLines] = useState([]);
+  const [lineCoverCode, setLineCoverCode] = useState([]);
 
   useQuery({
     queryKey: ['coveredLines'],
     queryFn: async () => {
       const response = await fetch('http://localhost:7156/coveredLines');
       if (!response.ok) {
-        throw new Error('Failed to fetch /coveredLines')
+        throw new Error('Failed to fetch /coveredLines');
       }
       const receivedCoveredLines = await response.json();
-      setCoveredLines(receivedCoveredLines);
+      setLineCoverCode(receivedCoveredLines);
       return receivedCoveredLines;
     },
-    refetchInterval: 2000
-  })
+    refetchInterval: 2000,
+  });
 
-  const lineIsCovered = (lineNumber) => {
-    if (lineNumber > coveredLines.length) {
-      console.warn('lineIsCovered lineNumber out of range ' + lineNumber);
+  const getLineCoverCode = (lineNumber) => {
+    if (lineNumber > lineCoverCode.length) {
+      console.warn('getLineCoverCode lineNumber out of range ' + lineNumber);
       return false;
     }
-    return coveredLines[lineNumber];
+    return lineCoverCode[lineNumber];
   };
 
   useEffect(() => {
     if (!selectedFile) return;
 
-    window.electronAPI.readFileSync(selectedFile).then(content => {
-      console.log(content)
+    window.electronAPI.readFileSync(selectedFile).then((content) => {
+      console.log(content);
       // todo split by line?
-      setCode(content)
+      setCode(content);
     });
+  }, [selectedFile]);
 
-  }, [selectedFile])
+  return (
+    <div className="pl-1 w-full">
+      <div className="text-xl tracking-tight text-gray-900 border-b mb-3 pl-1">
+        {selectedFile ? selectedFile : ''}
+      </div>
+      <Highlight theme={themes.oneDark} language="cpp" code={code}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre style={style} className="flex w-full">
+            <div>
+              {tokens.map((line, i) => (
+                <div
+                  key={i}
+                  {...getLineProps({ line })}
+                  className="bg-white text-right"
+                >
+                  <div className="pr-2">{i + 1}</div>
+                </div>
+              ))}
+            </div>
+            <div className="w-full">
+              {tokens.map((line, i) => {
+                let bgColor;
+                switch (getLineCoverCode(i + 1)) {
+                  case 0:
+                    // Coverage Unknown
+                    bgColor = 'bg-white';
+                    break;
+                  case 1:
+                    // Covered
+                    bgColor = 'bg-green-100';
+                    break;
+                  case 2:
+                    // Not Covered
+                    bgColor = 'bg-red-100';
+                    break;
+                  default:
+                    bgColor = 'bg-white';
+                }
 
-  return <div className='pl-1 w-full'>
-    <div className='text-xl tracking-tight text-gray-900 border-b mb-3 pl-1'>{selectedFile ? selectedFile : ''}</div>
-    <Highlight theme={themes.oneDark} language='cpp' code={code}>
-      {({ className, style, tokens, getLineProps, getTokenProps }) => (
-        <pre style={style} className='flex w-full'>
-          <div>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })} className='bg-white text-right'>
-                <div className='pr-2'>{i + 1}</div>
-              </div>
-            ))}
-          </div>
-          <div className='w-full'>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })} className={`flex ${lineIsCovered(i + 1) ? 'bg-green-100' : 'bg-white'}`}>
-                {line.map((token, key) => (
-                  <div key={key} {...getTokenProps({ token })} />
-                ))}
-              </div>
-            ))}
-          </div>
-        </pre>
-      )}
-    </Highlight>
-  </div>
+                return (
+                  <div
+                    key={i}
+                    {...getLineProps({ line })}
+                    className={`flex ${bgColor}`}
+                  >
+                    {line.map((token, key) => (
+                      <div key={key} {...getTokenProps({ token })} />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </pre>
+        )}
+      </Highlight>
+    </div>
+  );
 }
 
 function Main() {
   // TODO: change def sel file to null
-  const [selectedFile, setSelectedFile] = useState('/home/user/P/FuzzSight/test/main.cpp')
+  const [selectedFile, setSelectedFile] = useState(
+    '/home/user/P/FuzzSight/test/main.cpp'
+  );
 
   return (
     <div className="min-h-screen w-full min-w-full prose flex">

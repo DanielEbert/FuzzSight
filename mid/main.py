@@ -13,6 +13,7 @@ from typing import NoReturn
 import json
 import subprocess
 import sys
+import struct
 
 
 BUFFER_SIZE = 1024
@@ -25,14 +26,22 @@ class SrcLine:
 
 class File:
     def __init__(self) -> None:
-        # Line index [0] does not exist and is thus never covered.
-        self.lines: list[bool] = [False]
+        # 0: unknown
+        # 1: covered
+        # 2: not covered
+        self.lines: list[int] = [0]
     
-    def set_covered_line(self, covered_line: int):
+    def set_covered_line(self, covered_line: int) -> None:
         if covered_line >= len(self.lines):
-            self.lines.extend([False] * (covered_line + 1 - len(self.lines)))
+            self.lines.extend([0] * (covered_line + 1 - len(self.lines)))
 
-        self.lines[covered_line] = True
+        self.lines[covered_line] = 1
+    
+    def set_uncovered_line(self, uncovered_line: int) -> None:
+        if uncovered_line >= len(self.lines):
+            self.lines.extend([0] * (uncovered_line + 1 - len(self.lines)))
+
+        self.lines[uncovered_line] = 2
 
 
 class Addr2Line:
@@ -43,20 +52,35 @@ class Addr2Line:
             stdout=subprocess.PIPE,
             text=True
         )
-    
-    def get_src_code(self, addr: int) -> str:
+
+    def get_src_code(self, addr: int) -> tuple[str, int]:
         assert self.addr2line_proc.poll() is None, 'addr2line_proc exited'
         self.addr2line_proc.stdin.write(f'{addr:x}\n')
         self.addr2line_proc.stdin.flush()
-        return self.addr2line_proc.stdout.readline()
+
+        src_code_location = self.addr2line_proc.stdout.readline()
+        file, line_str = src_code_location.split(' ')[0].split(':')
+        line = int(line_str)
+        return file, line
 
 
 class Program:
     def __init__(self, prog_path: str) -> None:
         self.prog_path = prog_path
         self.files: dict[str, File] = defaultdict(File)
-        self.cov_trace_pc_return_addresses = self.get_cov_trace_pc_return_addresses()
-        # TODO: convert addr to line using addr2line subproc
+        self.a2l = Addr2Line(self.prog_path)
+
+        self.set_uncovered_addresses()
+
+    def set_uncovered_addresses(self) -> None:
+        instrumented_addresses: list[int] = self.get_cov_trace_pc_return_addresses()
+
+        for addr in instrumented_addresses:
+            file, line = self.a2l.get_src_code(addr)
+            if file == '??':
+                print(f'Unknown source code location at {addr=}')
+                continue
+            self.files[file].set_uncovered_line(line)
 
     def get_cov_trace_pc_return_addresses(self) -> list[int]:
         cov_trace_pc_return_addresses: list[int] = []
@@ -72,6 +96,14 @@ class Program:
     
         return cov_trace_pc_return_addresses
 
+    def on_new_addr_covered(self, addr: int) -> None:
+        file, line = self.a2l.get_src_code(addr)
+        if file == '??':
+            print(f'Unknown source code location at {addr=}')
+            return
+
+        self.files[file].set_covered_line(line)
+
 
 
 # TODO: use argparse later
@@ -79,12 +111,10 @@ if len(sys.argv) < 2:
     raise Exception('Missing argument to target executable. ./main.py path/to/target')
 
 prog = Program(sys.argv[1])
-print(prog.cov_trace_pc_return_addresses)
-
 
 def main() -> NoReturn:
 
-    new_cov_queue: mp.Queue[tuple[int, str, int]] = mp.Queue()
+    new_cov_queue: mp.Queue[int] = mp.Queue()
 
     cov_receiver_proc = mp.Process(target=new_cov_receiver, args=(new_cov_queue,))
     cov_receiver_proc.start()
@@ -95,8 +125,9 @@ def main() -> NoReturn:
 
     while True:
         try:
-            _, file, line = new_cov_queue.get(block=False)
-            prog.files[file].set_covered_line(line)
+            pc = new_cov_queue.get(block=False)
+            prog.on_new_addr_covered(pc)
+            # TODO prog.files[file].set_covered_line(line)
         except queue.Empty:
             pass
 
@@ -115,23 +146,11 @@ def new_cov_receiver(new_cov_queue: mp.Queue[tuple[int, str, int]]) -> None:
     while True:
         message, _ = sock.recvfrom(BUFFER_SIZE)
 
-        pc, file, line = message.decode().split('\t')
-        # ASAN decrements 1 from pc
-        pc += 1
-        print('Received', pc, file, line)
+        print(message)
+        pc = struct.unpack('Q', message)[0]
+        print('Received', pc)
 
-        try:
-            pc_int = int(pc, 16)
-        except:
-            pc_int = -1
-            print(f'Warning: Failed to convert {pc} to int.')
-        try:
-            line_int = int(line)
-        except:
-            line_int = -1
-            print(f'Warning: Failed to convert {line} to int.')
-        
-        new_cov_queue.put((pc_int, file, line_int))
+        new_cov_queue.put(pc)
 
 
 API_PORT = 7156

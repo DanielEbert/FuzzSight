@@ -13,9 +13,6 @@
 const uint32_t COV_BITMAP_SIZE = 16777216;  // 2 ** 24
 const uint32_t COV_SERVER_PORT = 7155;
 
-extern "C"
-void __sanitizer_symbolize_pc(void* pc, const char* fmt, char* out_buf, size_t out_buf_size);
-
 
 struct CovBitmap {
     uint8_t buf[COV_BITMAP_SIZE];
@@ -73,9 +70,10 @@ void initSock()
     covServer.sin_addr.s_addr = inet_addr("127.0.0.1");
 }
 
-void covSend(char* msg)
+void covSend(void* pc)
 {
-    if (sendto(covSenderFd, msg, strlen(msg), 0, (struct sockaddr *)&covServer, sizeof(covServer)) < 0)
+    uint64_t pc_int = reinterpret_cast<uint64_t>(pc);
+    if (sendto(covSenderFd, &pc_int, sizeof(uint64_t), 0, (struct sockaddr *)&covServer, sizeof(covServer)) < 0)
     {
         perror("Failed to sendto:");
         exit(45);
@@ -105,9 +103,7 @@ void __sanitizer_cov_trace_pc(void)
     {
         covSet(pc);
 
-        char pcDescr[1024];
-        __sanitizer_symbolize_pc(pc, "%p\t%s\t%l", pcDescr, sizeof(pcDescr));
-        covSend(pcDescr);
+        covSend(pc);
 
         printf("First hit of %p\n", pc);
     }
