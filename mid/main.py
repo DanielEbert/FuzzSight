@@ -34,6 +34,23 @@ class File:
 
         self.lines[covered_line] = True
 
+
+class Addr2Line:
+    def __init__(self, prog_path: str) -> None:
+        self.addr2line_proc = subprocess.Popen(
+            ['addr2line', '-i', '-e', prog_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True
+        )
+    
+    def get_src_code(self, addr: int) -> str:
+        assert self.addr2line_proc.poll() is None, 'addr2line_proc exited'
+        self.addr2line_proc.stdin.write(f'{addr:x}\n')
+        self.addr2line_proc.stdin.flush()
+        return self.addr2line_proc.stdout.readline()
+
+
 class Program:
     def __init__(self, prog_path: str) -> None:
         self.prog_path = prog_path
