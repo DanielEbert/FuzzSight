@@ -132,11 +132,15 @@ function MultiSelectCheckboxAsync({ setSelectedFile }) {
                   className="whitespace-nowrap select-none w-full"
                   onClick={(e) => {
                     console.log('clicked' + element.fullpath);
+
+                    setSelectedFile({
+                      path: element.fullpath,
+                      isFolder: element.isBranch,
+                    });
+
                     if (element.isBranch) {
                       return;
                     }
-
-                    setSelectedFile(element.fullpath);
 
                     e.stopPropagation();
                   }}
@@ -181,15 +185,115 @@ function Sidebar({ setSelectedFile }) {
   );
 }
 
+function CoverageTable({ fileData }) {
+  return (
+    <table className="w-full text-left text-gray-500 table-fixed">
+      <tr>
+        <th scope="col" className="px-6 py-3">
+          Filename
+        </th>
+        <th scope="col" className="px-6 py-3 text-center w-[150px]">
+          Covered
+        </th>
+        <th scope="col" className="px-6 py-3 text-center w-[150px]">
+          Uncovered
+        </th>
+      </tr>
+      <tbody>
+        {fileData.map((f) => {
+          const [filename, coveredLines, uncoveredLines] = f;
+          return (
+            <tr className="border-b hover:bg-gray-50">
+              <th
+                scope="row"
+                className="px-4 py-2 relative font-medium text-gray-900 whitespace-nowrap"
+              >
+                <div class="group relative">
+                  <div className="overflow-x-hidden">{filename}</div>
+                  <div class="absolute inset-0 flex opacity-0 group-hover:opacity-100 bg-gray-50 bg-opacity-100 w-screen">
+                    {filename}
+                  </div>
+                </div>
+              </th>
+              <th
+                scope="row"
+                className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap text-center"
+              >
+                {coveredLines}
+              </th>
+              <th
+                scope="row"
+                className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap text-center"
+              >
+                {uncoveredLines}
+              </th>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function CoverageOverview({ selectedFolder }) {
+  // fileCoverage[0] are selected files, [1] are unselected
+  const [fileCoverage, setFileCoverage] = useState({
+    selected: [],
+    unselected: [],
+  });
+
+  const coverageOverviewQueryParams = new URLSearchParams({
+    path: selectedFolder,
+  });
+
+  useQuery({
+    queryKey: ['coverageOverview'],
+    queryFn: async () => {
+      const response = await fetch(
+        `http://localhost:7156/coverageOverview?${coverageOverviewQueryParams}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch /coverageOverview');
+      }
+      const receivedCoverageOverview = await response.json();
+      setFileCoverage(receivedCoverageOverview);
+      return receivedCoverageOverview;
+    },
+    refetchInterval: 2000,
+  });
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <div className="text-xl font-bold whitespace-nowrap text-gray-900 px-3 py-1">
+          Files in {selectedFolder}
+        </div>
+        <CoverageTable fileData={fileCoverage.selected} />
+      </div>
+      <div>
+        <div className="text-xl font-bold whitespace-nowrap text-gray-900 px-3 py-1">
+          Other Files
+        </div>
+        <CoverageTable fileData={fileCoverage.unselected} />
+      </div>
+    </div>
+  );
+}
+
 function CodePanel({ selectedFile }) {
   const [code, setCode] = useState('');
-  // TODO: later check if out of range
   const [lineCoverCode, setLineCoverCode] = useState([]);
+
+  const coveredLinesQueryParams = new URLSearchParams({
+    path: selectedFile,
+  });
 
   useQuery({
     queryKey: ['coveredLines'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:7156/coveredLines');
+      const response = await fetch(
+        `http://localhost:7156/coveredLines?${coveredLinesQueryParams}`
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch /coveredLines');
       }
@@ -279,14 +383,21 @@ function CodePanel({ selectedFile }) {
 
 function Main() {
   // TODO: change def sel file to null
-  const [selectedFile, setSelectedFile] = useState(
-    '/home/user/P/FuzzSight/test/main.cpp'
-  );
+  const [selectedFile, setSelectedFile] = useState({
+    path: '/home/user/P/FuzzSight',
+    isFolder: true,
+    // path: '/home/user/P/FuzzSight/test/main.cpp',
+    // isFolder: false,
+  });
 
   return (
     <div className="min-h-screen w-full min-w-full prose flex">
       <Sidebar setSelectedFile={setSelectedFile} />
-      <CodePanel selectedFile={selectedFile} />
+      {selectedFile.isFolder ? (
+        <CoverageOverview selectedFolder={selectedFile.path} />
+      ) : (
+        <CodePanel selectedFile={selectedFile.path} />
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import json
 import subprocess
 import sys
 import struct
+from flask import request
 
 
 BUFFER_SIZE = 1024
@@ -24,9 +25,6 @@ LINE_NOT_COVERED = 2
 
 class File:
     def __init__(self) -> None:
-        # 0: unknown
-        # 1: covered
-        # 2: not covered
         self.lines: list[int] = [LINE_COVERAGE_UNKNOWN]
 
     def set_covered_line(self, covered_line: int) -> None:
@@ -42,10 +40,10 @@ class File:
         self.lines[uncovered_line] = LINE_NOT_COVERED
     
     def get_covered_lines_count(self) -> int:
-        self.lines.count(LINE_COVERED)
+        return self.lines.count(LINE_COVERED)
 
     def get_uncovered_lines_count(self) -> int:
-        self.lines.count(LINE_NOT_COVERED)
+        return self.lines.count(LINE_NOT_COVERED)
 
 
 class Addr2Line:
@@ -107,12 +105,18 @@ class Program:
             return
 
         self.files[file].set_covered_line(line)
-    
+
     def get_coverage_overview(self) -> tuple[str, int, int]:
         # Returns tuple of [filename, covered_lines, uncovered_lines]
         ret = []
         for filename, file in self.files.items():
-            ret.append((filename, file.get_covered_lines_count(), file.get_uncovered_lines_count()))
+            covered_count = file.get_covered_lines_count()
+            uncovered_count = file.get_uncovered_lines_count()
+            if covered_count + uncovered_count == 0:
+                continue
+            ret.append((filename, covered_count, uncovered_count))
+        ret.sort(key=lambda x: x[1] + x[2], reverse=True)
+        return ret
 
 
 # TODO: use argparse later
@@ -165,16 +169,30 @@ CORS(app)
 
 @app.route('/coveredLines')
 def getCoveredLines():
-    # TODO: file based on param
-    ret = json.dumps(prog.files['/home/user/P/FuzzSight/test/main.cpp'].lines)
+    path = request.args.get('path')
+    ret = json.dumps(prog.files[path].lines)
     return ret
 
 
+# TODO: maybe send 2 sets: the one in rootPath and the rest
 @app.route('/coverageOverview')
 def getCoverageOverview():
-    ret = json.dumps(prog.get_coverage_overview())
-    print(ret)
-    return ret
+    rootPath = request.args.get('path')
+
+    selected_files = []
+    unselected_files = []
+
+    for file_data in prog.get_coverage_overview():
+        # when prefix doesnt match due to build in different env, maybe check what opened folder path is and exclude that
+        if rootPath in file_data[0]:
+            selected_files.append(file_data)
+        else:
+            unselected_files.append(file_data)
+
+    return json.dumps({
+        'selected': selected_files,
+        'unselected': unselected_files
+    })
 
 if __name__ == '__main__':
     raise SystemExit(main())
